@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Менеджер файлов</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding-top: 20px;
+        }
+        .card {
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        .nav-tabs {
+            border-bottom: none;
+            margin-bottom: 20px;
+        }
+        .nav-tabs .nav-link {
+            border-radius: 8px 8px 0 0;
+            padding: 10px 20px;
+            font-weight: 500;
+        }
+        .nav-tabs .nav-link.active {
+            background-color: #fff;
+            border-color: #dee2e6 #dee2e6 #fff;
+        }
+        .table th {
+            background-color: #f8f9fa;
+        }
+        .actions {
+            white-space: nowrap;
+        }
+        .spinner-border {
+            width: 1rem;
+            height: 1rem;
+        }
+        .pagination {
+            justify-content: center;
+        }
+        .status-new { color: #0d6efd; }
+        .status-downloading { color: #ffc107; }
+        .status-uploading { color: #fd7e14; }
+        .status-completed { color: #198754; }
+        .status-error { color: #dc3545; }
+        .tooltip-inner {
+            max-width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="mb-4">
+            <h1 class="text-center mb-4">Система управления файлами</h1>
+        </header>
+
+        <ul class="nav nav-tabs" id="mainTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="servers-tab" data-bs-toggle="tab" data-bs-target="#servers-tab-pane" type="button" role="tab" aria-controls="servers-tab-pane" aria-selected="true">
+                    <i class="bi bi-server"></i> Серверы
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="files-tab" data-bs-toggle="tab" data-bs-target="#files-tab-pane" type="button" role="tab" aria-controls="files-tab-pane" aria-selected="false">
+                    <i class="bi bi-files"></i> Файлы
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="mainTabContent">
+            <!-- Вкладка серверов -->
+            <div class="tab-pane fade show active" id="servers-tab-pane" role="tabpanel" aria-labelledby="servers-tab" tabindex="0">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Список серверов</h5>
+                        <button type="button" class="btn btn-primary" id="addServerBtn">
+                            <i class="bi bi-plus-circle"></i> Добавить сервер
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Хост</th>
+                                        <th>Порт</th>
+                                        <th>Путь</th>
+                                        <th>Пользователь</th>
+                                        <th>Сканирование</th>
+                                        <th>Действия</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="serverTableBody">
+                                    <tr>
+                                        <td colspan="7" class="text-center">
+                                            <div class="spinner-border text-primary" role="status">
+                                                <span class="visually-hidden">Загрузка...</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <nav aria-label="Навигация по серверам">
+                            <ul class="pagination" id="serversPagination">
+                                <li class="page-item disabled">
+                                    <a class="page-link" href="#" tabindex="-1">Загрузка...</a>
+                                </li>
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Вкладка файлов -->
+            <div class="tab-pane fade" id="files-tab-pane" role="tabpanel" aria-labelledby="files-tab" tabindex="0">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Список файлов</h5>
+                        <div>
+                            <button type="button" class="btn btn-outline-primary" id="refreshFilesBtn">
+                                <i class="bi bi-arrow-clockwise"></i> Обновить
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Сервер ID</th>
+                                        <th>Имя файла</th>
+                                        <th>Размер</th>
+                                        <th>Статус</th>
+                                        <th>Путь MinIO</th>
+                                        <th>Ошибка</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="fileTableBody">
+                                    <tr>
+                                        <td colspan="7" class="text-center">
+                                            <div class="spinner-border text-primary" role="status">
+                                                <span class="visually-hidden">Загрузка...</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <nav aria-label="Навигация по файлам">
+                            <ul class="pagination" id="filesPagination">
+                                <li class="page-item disabled">
+                                    <a class="page-link" href="#" tabindex="-1">Загрузка...</a>
+                                </li>
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно для добавления/редактирования сервера -->
+    <div class="modal fade" id="serverModal" tabindex="-1" aria-labelledby="serverModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="serverModalLabel">Добавить сервер</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="serverForm">
+                        <input type="hidden" id="serverId" value="">
+                        <div class="mb-3">
+                            <label for="host" class="form-label">Хост</label>
+                            <input type="text" class="form-control" id="host" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="port" class="form-label">Порт</label>
+                            <input type="number" class="form-control" id="port" required min="1" max="65535" value="22">
+                        </div>
+                        <div class="mb-3">
+                            <label for="path" class="form-label">Путь к папке</label>
+                            <input type="text" class="form-control" id="path" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Имя пользователя</label>
+                            <input type="text" class="form-control" id="username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Пароль</label>
+                            <input type="password" class="form-control" id="password" required>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="scanning" checked>
+                            <label class="form-check-label" for="scanning">
+                                Включить сканирование
+                            </label>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" id="saveServerBtn">Сохранить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно подтверждения удаления -->
+    <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Подтверждение удаления</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Вы действительно хотите удалить этот сервер?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Удалить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Глобальные переменные для пагинации
+        const pageSize = 10;
+        let serversCurrentPage = 0;
+        let filesCurrentPage = 0;
+        let serversTotalPages = 0;
+        let filesTotalPages = 0;
+        let serverToDelete = null;
+        
+        // Инициализация тултипов Bootstrap
+        document.addEventListener('DOMContentLoaded', function() {
+            const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+            
+            // Загрузка данных при открытии страницы
+            loadServers(0);
+            
+            // Загрузка файлов при переключении на вкладку с файлами
+            document.getElementById('files-tab').addEventListener('click', function() {
+                if (filesCurrentPage === 0) {
+                    loadFiles(0);
+                }
+            });
+            
+            // Обработчики кнопок
+            document.getElementById('addServerBtn').addEventListener('click', showAddServerModal);
+            document.getElementById('saveServerBtn').addEventListener('click', saveServer);
+            document.getElementById('refreshFilesBtn').addEventListener('click', () => loadFiles(filesCurrentPage));
+            document.getElementById('confirmDeleteBtn').addEventListener('click', deleteServer);
+        });
+        
+        // Функция загрузки серверов
+        async function loadServers(page) {
+            try {
+                const offset = page * pageSize;
+                const response = await fetch(`/servers?limit=${pageSize}&offset=${offset}`);
+                if (!response.ok) {
+                    throw new Error('Ошибка загрузки серверов');
+                }
+                
+                const servers = await response.json();
+                displayServers(servers);
+                
+                // Обновление пагинации
+                const totalCount = response.headers.get('X-Total-Count') || servers.length;
+                serversTotalPages = Math.ceil(totalCount / pageSize);
+                serversCurrentPage = page;
+                updatePagination('serversPagination', serversCurrentPage, serversTotalPages, loadServers);
+                
+            } catch (error) {
+                console.error('Ошибка:', error);
+                showErrorAlert('Ошибка при загрузке серверов: ' + error.message);
+            }
+        }
+        
+        // Функция загрузки файлов
+        async function loadFiles(page) {
+            try {
+                const offset = page * pageSize;
+                const response = await fetch(`/files?limit=${pageSize}&offset=${offset}`);
+                if (!response.ok) {
+                    throw new Error('Ошибка загрузки файлов');
+                }
+                
+                const files = await response.json();
+                displayFiles(files);
+                
+                // Обновление пагинации
+                const totalCount = response.headers.get('X-Total-Count') || files.length;
+                filesTotalPages = Math.ceil(totalCount / pageSize);
+                filesCurrentPage = page;
+                updatePagination('filesPagination', filesCurrentPage, filesTotalPages, loadFiles);
+                
+            } catch (error) {
+                console.error('Ошибка:', error);
+                showErrorAlert('Ошибка при загрузке файлов: ' + error.message);
+            }
+        }
+        
+        // Функция отображения серверов в таблице
+        function displayServers(servers) {
+            const tableBody = document.getElementById('serverTableBody');
+            tableBody.innerHTML = '';
+            
+            if (servers.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center">Нет добавленных серверов</td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            servers.forEach(server => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${server.id || '-'}</td>
+                    <td>${server.host}</td>
+                    <td>${server.port}</td>
+                    <td>${server.path}</td>
+                    <td>${server.username}</td>
+                    <td>
+                        <span class="badge ${server.scanning ? 'bg-success' : 'bg-secondary'}">
+                            ${server.scanning ? 'Активно' : 'Отключено'}
+                        </span>
+                    </td>
+                    <td class="actions">
+                        <button type="button" class="btn btn-sm btn-outline-primary edit-server" data-id="${server.id}" 
+                            data-host="${server.host}" data-port="${server.port}" data-path="${server.path}" 
+                            data-username="${server.username}" data-password="${server.password}" data-scanning="${server.scanning}">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-danger delete-server" data-id="${server.id}">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                `;
+                tableBody.appendChild(tr);
+            });
+            
+            // Добавление обработчиков событий для кнопок редактирования и удаления
+            document.querySelectorAll('.edit-server').forEach(button => {
+                button.addEventListener('click', () => {
+                    const serverData = {
+                        id: button.getAttribute('data-id'),
+                        host: button.getAttribute('data-host'),
+                        port: button.getAttribute('data-port'),
+                        path: button.getAttribute('data-path'),
+                        username: button.getAttribute('data-username'),
+                        password: button.getAttribute('data-password'),
+                        scanning: button.getAttribute('data-scanning') === 'true'
+                    };
+                    showEditServerModal(serverData);
+                });
+            });
+            
+            document.querySelectorAll('.delete-server').forEach(button => {
+                button.addEventListener('click', () => {
+                    const serverId = button.getAttribute('data-id');
+                    showDeleteConfirmation(serverId);
+                });
+            });
+        }
+        
+        // Функция отображения файлов в таблице
+        function displayFiles(files) {
+            const tableBody = document.getElementById('fileTableBody');
+            tableBody.innerHTML = '';
+            
+            if (files.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center">Нет загруженных файлов</td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            files.forEach(file => {
+                const tr = document.createElement('tr');
+                
+                // Определение класса для статуса
+                let statusClass = '';
+                switch (file.status) {
+                    case 'new': statusClass = 'status-new'; break;
+                    case 'downloading': statusClass = 'status-downloading'; break;
+                    case 'uploading': statusClass = 'status-uploading'; break;
+                    case 'completed': statusClass = 'status-completed'; break;
+                    case 'error': statusClass = 'status-error'; break;
+                    default: statusClass = '';
+                }
+                
+                // Форматирование размера файла
+                const fileSize = formatFileSize(file.size);
+                
+                tr.innerHTML = `
+                    <td>${file.id || '-'}</td>
+                    <td>${file.server_id}</td>
+                    <td>${file.filename}</td>
+                    <td>${fileSize}</td>
+                    <td><span class="badge ${statusClass}">${file.status}</span></td>
+                    <td>${file.minio_path || '-'}</td>
+                    <td>${file.error_message ? 
+                        `<span class="text-danger" data-bs-toggle="tooltip" title="${file.error_message}">
+                            <i class="bi bi-exclamation-circle"></i> Ошибка
+                        </span>` : '-'}
+                    </td>
+                `;
+                tableBody.appendChild(tr);
+            });
+            
+            // Обновление тултипов
+            const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        }
+        
+        // Функция форматирования размера файла
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        // Обновление пагинации
+        function updatePagination(paginationId, currentPage, totalPages, loadFunction) {
+            const pagination = document.getElementById(paginationId);
+            pagination.innerHTML = '';
+            
+            // Кнопка "Предыдущая"
+            const prevBtn = document.createElement('li');
+            prevBtn.className = `page-item ${currentPage === 0 ? 'disabled' : ''}`;
+            prevBtn.innerHTML = `<a class="page-link" href="#" tabindex="-1">Предыдущая</a>`;
+            if (currentPage > 0) {
+                prevBtn.querySelector('a').addEventListener('click', (e) => {
+                    e.preventDefault();
+                    loadFunction(currentPage - 1);
+                });
+            }
+            pagination.appendChild(prevBtn);
+            
+            // Страницы
+            const startPage = Math.max(0, currentPage - 2);
+            const endPage = Math.min(totalPages - 1, currentPage + 2);
+            
+            for (let i = startPage; i <= endPage; i++) {
+                const pageItem = document.createElement('li');
+                pageItem.className = `page-item ${i === currentPage ? 'active' : ''}`;
+                pageItem.innerHTML = `<a class="page-link" href="#">${i + 1}</a>`;
+                pageItem.querySelector('a').addEventListener('click', (e) => {
+                    e.preventDefault();
+                    loadFunction(i);
+                });
+                pagination.appendChild(pageItem);
+            }
+            
+            // Кнопка "Следующая"
+            const nextBtn = document.createElement('li');
+            nextBtn.className = `page-item ${currentPage >= totalPages - 1 ? 'disabled' : ''}`;
+            nextBtn.innerHTML = `<a class="page-link" href="#">Следующая</a>`;
+            if (currentPage < totalPages - 1) {
+                nextBtn.querySelector('a').addEventListener('click', (e) => {
+                    e.preventDefault();
+                    loadFunction(currentPage + 1);
+                });
+            }
+            pagination.appendChild(nextBtn);
+        }
+        
+        // Функция показа модального окна для добавления сервера
+        function showAddServerModal() {
+            const modalTitle = document.getElementById('serverModalLabel');
+            modalTitle.textContent = 'Добавить сервер';
+            
+            // Очистка формы
+            document.getElementById('serverForm').reset();
+            document.getElementById('serverId').value = '';
+            
+            // Открытие модального окна
+            const modal = new bootstrap.Modal(document.getElementById('serverModal'));
+            modal.show();
+        }
+        
+        // Функция показа модального окна для редактирования сервера
+        function showEditServerModal(server) {
+            const modalTitle = document.getElementById('serverModalLabel');
+            modalTitle.textContent = 'Редактировать сервер';
+            
+            // Заполнение формы данными сервера
+            document.getElementById('serverId').value = server.id;
+            document.getElementById('host').value = server.host;
+            document.getElementById('port').value = server.port;
+            document.getElementById('path').value = server.path;
+            document.getElementById('username').value = server.username;
+            document.getElementById('password').value = server.password;
+            document.getElementById('scanning').checked = server.scanning;
+            
+            // Открытие модального окна
+            const modal = new bootstrap.Modal(document.getElementById('serverModal'));
+            modal.show();
+        }
+        
+        // Функция сохранения сервера (добавление или редактирование)
+        async function saveServer() {
+            const serverId = document.getElementById('serverId').value;
+            const isEdit = serverId !== '';
+            
+            const serverData = {
+                host: document.getElementById('host').value,
+                port: parseInt(document.getElementById('port').value),
+                path: document.getElementById('path').value,
+                username: document.getElementById('username').value,
+                password: document.getElementById('password').value,
+                scanning: document.getElementById('scanning').checked
+            };
+            
+            try {
+                let response;
+                if (isEdit) {
+                    // Обновление существующего сервера
+                    response = await fetch(`/servers/${serverId}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(serverData)
+                    });
+                } else {
+                    // Добавление нового сервера
+                    response = await fetch('/servers', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(serverData)
+                    });
+                }
+                
+                if (!response.ok) {
+                    throw new Error(`Ошибка ${response.status}: ${response.statusText}`);
+                }
+                
+                // Закрытие модального окна
+                const modal = bootstrap.Modal.getInstance(document.getElementById('serverModal'));
+                modal.hide();
+                
+                // Обновление списка серверов
+                loadServers(serversCurrentPage);
+                
+                // Показать уведомление об успехе
+                showAlert(isEdit ? 'Сервер успешно обновлен' : 'Сервер успешно добавлен', 'success');
+                
+            } catch (error) {
+                console.error('Ошибка:', error);
+                showErrorAlert('Ошибка при сохранении сервера: ' + error.message);
+            }
+        }
+        
+        // Функция показа подтверждения удаления
+        function showDeleteConfirmation(serverId) {
+            serverToDelete = serverId;
+            const modal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+            modal.show();
+        }
+        
+        // Функция удаления сервера
+        async function deleteServer() {
+            if (!serverToDelete) return;
+            
+            try {
+                const response = await fetch(`/servers/${serverToDelete}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Ошибка ${response.status}: ${response.statusText}`);
+                }
+                
+                // Закрытие модального окна
+                const modal = bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal'));
+                modal.hide();
+                
+                // Обновление списка серверов
+                loadServers(serversCurrentPage);
+                
+                // Показать уведомление об успехе
+                showAlert('Сервер успешно удален', 'success');
+                
+            } catch (error) {
+                console.error('Ошибка:', error);
+                showErrorAlert('Ошибка при удалении сервера: ' + error.message);
+            } finally {
+                serverToDelete = null;
+            }
+        }
+        
+        // Функция для показа уведомлений
+        function showAlert(message, type = 'info') {
+            const alertPlaceholder = document.createElement('div');
+            alertPlaceholder.className = 'position-fixed bottom-0 end-0 p-3';
+            alertPlaceholder.style.zIndex = '5';
+            
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = `
+                <div class="toast align-items-center text-white bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="d-flex">
+                        <div class="toast-body">
+                            ${message}
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Закрыть"></button>
+                    </div>
+                </div>
+            `;
+            
+            alertPlaceholder.append(wrapper.firstChild);
+            document.body.append(alertPlaceholder);
+            
+            const toast = new bootstrap.Toast(alertPlaceholder.querySelector('.toast'), { delay: 3000 });
+            toast.show();
+            
+            toast._element.addEventListener('hidden.bs.toast', () => {
+                alertPlaceholder.remove();
+            });
+        }
+        
+        // Функция для показа уведомлений об ошибках
+        function showErrorAlert(message) {
+            showAlert(message, 'danger');
+        }
+    </script>
+</body>
+</html>

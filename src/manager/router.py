@@ -1,15 +1,16 @@
 from pathlib import Path
 
-from crud import FileDAO, ServerDAO
-from dependencies import get_session_with_commit, get_session_without_commit
 from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.templating import Jinja2Templates
-from schemas import FileSchema, ServerSchema
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from .crud import FileDAO, ServerDAO
+from .dependencies import get_session_with_commit, get_session_without_commit
+from .schemas import FileSchema, ServerSchema
 
 router = APIRouter()
 
-template = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+template = Jinja2Templates(directory=Path(__file__).parent.parent.parent / "templates")
 
 
 @router.get("/")
