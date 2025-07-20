@@ -89,6 +89,30 @@ class BaseDAO(Generic[T]):
             logger.error(f"Ошибка при добавлении записи: {e}")
             raise
 
+    async def update(
+        self, session: AsyncSession, filters: BaseModel, values: BaseModel
+    ):
+        # Обновление записей по фильтрам
+        filter_dict = filters.model_dump(exclude_unset=True)
+        values_dict = values.model_dump(exclude_unset=True)
+        logger.info(
+            f"Обновление записей {self.model.__name__} по фильтру: {filter_dict} с параметрами: {values_dict}"
+        )
+        try:
+            query = (
+                sqlalchemy_update(self.model)
+                .where(*[getattr(self.model, k) == v for k, v in filter_dict.items()])
+                .values(**values_dict)
+                .execution_options(synchronize_session="fetch")
+            )
+            result = await session.execute(query)
+            logger.info(f"Обновлено {result.rowcount} записей.")
+            await session.flush()
+            return result
+        except SQLAlchemyError as e:
+            logger.error(f"Ошибка при обновлении записей: {e}")
+            raise
+
 
 class ServerDAO(BaseDAO):
     model = Server

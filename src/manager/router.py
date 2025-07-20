@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .crud import FileDAO, ServerDAO
 from .dependencies import get_session_with_commit, get_session_without_commit
-from .schemas import FileSchema, ServerSchema
+from .schemas import FileSchema, ServerID, ServerSchema
 
 router = APIRouter()
 
@@ -64,11 +64,9 @@ async def update_server(
     """
     Обновляет информацию о сервере.
     """
-    server = await ServerDAO().find_one_or_none_by_id(
-        session=session, data_id=server_id
+    await ServerDAO().update(
+        session=session, filters=ServerID(id=server_id), values=server
     )
-    server.scanning = False
-    session.add(server)
     return {"message": "Сервер успешно обновлен"}
 
 
