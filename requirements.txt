@@ -1,0 +1,8 @@
+pydantic
+sqlalchemy
+aiosqlite
+pydantic-settings
+jinja2
+loguru
+fastapi
+uvicorn
