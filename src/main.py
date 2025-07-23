@@ -4,8 +4,8 @@ import uvicorn
 from fastapi import FastAPI
 from loguru import logger
 
-from database import create_tables
-from manager.router import router
+from .database import create_tables
+from .manager.router import router
 
 
 @asynccontextmanager

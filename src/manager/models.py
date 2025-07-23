@@ -3,7 +3,7 @@ from enum import Enum
 from sqlalchemy import BigInteger, Boolean, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from database import Base
+from ..database import Base
 
 
 # Enum для статуса файла

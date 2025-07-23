@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, mapped_column
 
-from config import settings
+from .config import settings
 
 engine = create_async_engine(url=settings.DB_URL)
 async_session_maker = async_sessionmaker(engine, class_=AsyncSession)

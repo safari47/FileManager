@@ -1,0 +1,47 @@
+services:
+  app:
+    container_name: my_app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: always
+  
+  celery_beat:
+    container_name: celery_beat
+    build: .
+    command: celery -A src.celery_app beat --loglevel=info
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+
+  celery_worker_scan:
+    container_name: celery_worker_scan
+    build: .
+    command: celery -A src.celery_app worker --loglevel=error -Q scan_servers --concurrency=1
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+        
+  celery_flower:
+    container_name: flower
+    image: mher/flower:0.9.7
+    command: flower --broker=redis://redis:6379/0 --port=5555
+    environment:
+      - FLOWER_BASIC_AUTH=admin:admin  # Опционально: простая аутентификация
+    ports:
+      - "5556:5555"
+    depends_on:
+      - redis
+
+  redis:
+    container_name: redis
+    image: redis:latest
+    ports:
+      - "6379:6379"

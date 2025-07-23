@@ -9,8 +9,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
-from database import Base
-from manager.models import File, Server
+from ..database import Base
+from .models import File, Server
 
 T = TypeVar("T", bound=Base)
 
