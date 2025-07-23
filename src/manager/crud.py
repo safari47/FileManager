@@ -43,6 +43,23 @@ class BaseDAO(Generic[T]):
             logger.error(f"Ошибка при удалении записи с ID {data_id}: {e}")
             raise
 
+    async def find_one_or_none(self, session: AsyncSession, filters: BaseModel):
+        # Поиск одной записи по фильтрам
+        filter_dict = filters.model_dump(exclude_unset=True)
+        logger.info(
+            f"Поиск одной записи {self.model.__name__} по фильтрам: {filter_dict}"
+        )
+        try:
+            query = select(self.model).filter_by(**filter_dict)
+            result = await session.execute(query)
+            record = result.scalar_one_or_none()
+            log_message = f"Запись {'найдена' if record else 'не найдена'} по фильтрам: {filter_dict}"
+            logger.info(log_message)
+            return record
+        except SQLAlchemyError as e:
+            logger.error(f"Ошибка при поиске записи по фильтрам {filter_dict}: {e}")
+            raise
+
     async def find_all(
         self,
         session: AsyncSession,

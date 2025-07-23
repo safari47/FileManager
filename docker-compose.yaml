@@ -28,7 +28,15 @@ services:
       - .:/app
     depends_on:
       - redis
-        
+  
+  celery_worker_download:
+    container_name: celery_worker_download
+    build: .
+    command: celery -A src.celery_app worker --loglevel=error -Q download_queue --concurrency=10
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
   celery_flower:
     container_name: flower
     image: mher/flower:0.9.7

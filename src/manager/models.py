@@ -7,12 +7,13 @@ from ..database import Base
 
 
 # Enum для статуса файла
-class FileStatus(Enum):
+class FileStatus(str, Enum):
     NEW = "new" # Новый файл
     DOWNLOADING = "downloading" # Загружается
     UPLOADED = "uploaded" # Загружен
     ERROR = "error" # Ошибка
     RETRY = "retry" # Повторная попытка
+
 
 # Модель для хранения информации о серверах и связи с файлами
 class Server(Base):
@@ -27,7 +28,7 @@ class Server(Base):
 class File(Base):
     server_id: Mapped[int] = mapped_column(Integer, nullable=False) # ID сервера, на котором хранится файл
     filename: Mapped[str] = mapped_column(String, nullable=False) # Имя файла
-    status: Mapped[FileStatus] = mapped_column(String, nullable=False, default=FileStatus.NEW) # Статус файла
-    size: Mapped[int] = mapped_column(BigInteger, nullable=False) # Размер файла в байтах
+    status: Mapped[FileStatus] = mapped_column(String, nullable=False)  # Статус файла
+    size: Mapped[int] = mapped_column(BigInteger, nullable=False)  # Размер файла в Мб
     minio_path: Mapped[str] = mapped_column(String, nullable=True) # Путь к файлу в MinIO (если используется)
     error_message: Mapped[str] = mapped_column(String, nullable=True) # Сообщение об ошибке (если есть)

@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     REDIS_HOST: str  # Redis host
     REDIS_PORT: int  # Redis port
     REDIS_DB: int  # Redis database number
+    LOCAL_DOWNLOAD_PATH: str  # Local path for downloaded files
     FORMAT_LOG: str = (
         "{time:YYYY-MM-DD at HH:mm:ss} | {level} | {message}"  # Log format for Loguru
     )
