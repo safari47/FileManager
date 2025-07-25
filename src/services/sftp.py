@@ -40,7 +40,7 @@ class SFTPService:
             self.sftp = self.client.open_sftp()
             logger.info(f"✅ SFTP соединение с {self.host} установлено")
         except Exception as e:
-            logger.error(f"❌ Ошибка подключения к {self.host}: {str(e)}")
+            raise RuntimeError(f"Ошибка подключения к SFTP {self.host}: {e}")
 
     def disconnect(self) -> None:
         logger.debug(f"🔒 Отключение от SFTP {self.host}")
@@ -51,7 +51,7 @@ class SFTPService:
                 self.client.close()
             logger.debug(f"✅ SFTP соединение с {self.host} закрыто")
         except Exception as e:
-            logger.warning(f"⚠️ Проблема при отключении от {self.host}: {str(e)}")
+            raise RuntimeError(f"Ошибка при отключении от SFTP {self.host}: {e}")
 
     def _get_cached_files(self, host: str, path: str) -> dict:
         key = f"{host}:{path}"
@@ -94,19 +94,18 @@ class SFTPService:
 
     def scan_directory(self, path: str) -> list:
         if not self.sftp:
-            logger.error(f"❌ SFTP соединение не установлено при сканировании {path}")
-            return []
+            raise RuntimeError(
+                f"SFTP соединение не установлено при сканировании {path}"
+            )
 
         logger.info(f"🔍 Сканирование {self.host}:{path}")
         try:
             files = self.sftp.listdir_attr(path)
-
             if not files:
                 logger.info(f"📂 Директория {path} пуста")
                 return []
 
             logger.debug(f"📊 Найдено {len(files)} файлов в {path}")
-
             cached_files = self._get_cached_files(self.host, path)
 
             if cached_files:
@@ -122,8 +121,7 @@ class SFTPService:
                 self._save_files_to_cache(self.host, path, files)
                 return files
         except Exception as e:
-            logger.error(f"❌ Ошибка сканирования {self.host}:{path}: {str(e)}")
-            return []
+            raise RuntimeError(f"Ошибка сканирования {self.host}:{path}: {e}")
 
     @staticmethod
     def sftp_attr_to_dict(file):
@@ -147,54 +145,36 @@ class SFTPService:
     def file_is_stable(self, path: str, file: dict, sleep: int = 10) -> bool:
         filename = file["filename"]
         logger.debug(f"⏱️ Проверка стабильности файла {filename}")
-
         try:
-            # Первая проверка
             first_stat = self.sftp.stat(f"{path}/{filename}")
             time.sleep(sleep)
-            # Вторая проверка
             second_stat = self.sftp.stat(f"{path}/{filename}")
-
-            if (
+            return (
                 first_stat.st_size == second_stat.st_size
                 and first_stat.st_mtime == second_stat.st_mtime
-            ):
-                logger.debug(f"✅ Файл {filename} стабилен")
-                return True
-
-            logger.info(f"⏳ Файл {filename} все еще изменяется, ожидание...")
-            return False
-
+            )
         except Exception as e:
-            logger.error(f"❌ Невозможно проверить стабильность {filename}: {str(e)}")
-            return False
+            raise RuntimeError(f"Ошибка проверки стабильности {filename}: {e}")
 
     def download_file(self, remote_path: str, file: dict) -> bool:
         if not self.sftp:
-            logger.error("❌ SFTP соединение не установлено")
-            return False
-
+            raise RuntimeError("SFTP соединение не установлено")
         filename = file["filename"]
         try:
             local_path = self.get_local_path(self.host, remote_path)
-
-            # Проверка стабильности файла перед загрузкой
             if not self.file_is_stable(path=remote_path, file=file):
                 logger.warning(f"⚠️ Файл {filename} нестабилен, пропускаем")
                 return False
-
-            logger.info(f"⬇️ Загрузка: {remote_path}/{filename} → {local_path}")
-
+            logger.info(
+                f"⬇️ Загрузка: {remote_path}/{filename} → {local_path}/{filename}"
+            )
             self.sftp.get(
                 remotepath=f"{remote_path}/{filename}",
                 localpath=f"{local_path}/{filename}",
             )
-
             logger.info(
                 f"✅ Загружен файл {filename} ({file['st_size']/1024/1024:.2f} МБ)"
             )
             return True
-
         except Exception as e:
-            logger.error(f"❌ Ошибка загрузки {filename}: {str(e)}")
-            return False
+            raise RuntimeError(f"Ошибка загрузки {filename}: {e}")

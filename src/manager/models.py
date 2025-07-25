@@ -10,7 +10,8 @@ from ..database import Base
 class FileStatus(str, Enum):
     NEW = "new" # Новый файл
     DOWNLOADING = "downloading" # Загружается
-    UPLOADED = "uploaded" # Загружен
+    DOWNLOADED_TO_SERVER = "downloaded_to_server"  # Загружен на сервер
+    DOWNLOADED_TO_MINIO = "downloaded_to_minio"  # Загружен в MinIO
     ERROR = "error" # Ошибка
     RETRY = "retry" # Повторная попытка
 

@@ -32,7 +32,7 @@ services:
   celery_worker_download:
     container_name: celery_worker_download
     build: .
-    command: celery -A src.celery_app worker --loglevel=error -Q download_queue --concurrency=10
+    command: celery -A src.celery_app worker --loglevel=error -Q download_queue --concurrency=50
     volumes:
       - .:/app
     depends_on:

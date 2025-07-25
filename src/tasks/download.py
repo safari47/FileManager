@@ -12,64 +12,52 @@ from ..manager.models import FileStatus
 from ..services.sftp import SFTPService
 
 
-class DownloadedFileUpdateStatus(BaseModel):
+class DownloadedFile(BaseModel):
     server_id: int
     filename: str
     size: float
 
 
-class NewDownloadedFile(DownloadedFileUpdateStatus):
-    status: FileStatus
+class DownloadedFileUpdateStatus(DownloadedFile):
+    status: str
     minio_path: Optional[str] = None
     error_message: Optional[str] = None
 
 
-def update_downloaded_file_info(
-    server_id,
-    filename,
-    size,
-    status=FileStatus.NEW.value,
-    minio_path=None,
-    error_message=None,
-    new_status=None,
-):
-    """Обновляет информацию о загруженном файле в базе данных"""
-    try:
-
-        async def inner():
+def update_file_status(data: DownloadedFileUpdateStatus):
+    async def inner():
+        async with async_session_maker() as session:
             try:
-                async with async_session_maker() as session:
-                    if new_status:
-                        file = await FileDAO().find_one_or_none(
-                            session=session,
-                            filters=DownloadedFileUpdateStatus(
-                                server_id=server_id, filename=filename, size=size
-                            ),
-                        )
-                        file.status = new_status
-                        session.add(file)
-                    else:
-                        await FileDAO().add(
-                            session=session,
-                            values=NewDownloadedFile(
-                                server_id=server_id,
-                                filename=filename,
-                                size=size,
-                                status=status,
-                                minio_path=minio_path,
-                                error_message=error_message,
-                            ),
-                        )
-            except Exception as e:
-                logger.error(f"❌ Ошибка при обновлении информации о файле: {str(e)}")
-                return []
-            finally:
+                await FileDAO().upsert_file(
+                    session=session,
+                    filters=DownloadedFile(
+                        server_id=data.server_id,
+                        filename=data.filename,
+                        size=data.size,
+                    ),
+                    values=data,
+                )
                 await session.commit()
+            except Exception as e:
+                logger.error(
+                    f"Ошибка при обновлении статуса файла {data.filename}: {e}"
+                )
+                await session.rollback()
+                return False
 
-        return asyncio.run(inner())
-    except Exception as e:
-        logger.error(f"❌ Критическая ошибка при запуске асинхронной функции: {str(e)}")
-        return []
+    asyncio.run(inner())
+
+
+def set_status(server_id, filename, size, status, error_message=None):
+    update_file_status(
+        DownloadedFileUpdateStatus(
+            server_id=server_id,
+            filename=filename,
+            size=size,
+            status=status,
+            error_message=error_message,
+        )
+    )
 
 
 @celery.task(bind=True, max_retries=10)
@@ -83,104 +71,80 @@ def download_file_task(
     file: dict,
     server_id: int,
 ):
-    start_time = time.time()
     filename = file.get("filename", "неизвестный файл")
-    file_size_mb = file.get("st_size", 0) / 1024 / 1024
+    file_size_byte = file.get("st_size", 0)
+    file_size_mb = file_size_byte / 1024 / 1024
 
     logger.info(
-        f"⬇️ Запуск задачи скачивания {filename} ({file_size_mb} МБ) с {host}:{remote_path}"
+        f"⬇️ Задача скачивания {filename} ({file_size_mb:.2f} МБ) с {host}:{remote_path}"
     )
-    update_downloaded_file_info(
-        server_id=server_id, filename=filename, size=file_size_mb
-    )
+    set_status(server_id, filename, file_size_byte, FileStatus.NEW.value)
 
-    sftp_service = SFTPService(
-        host=host,
-        port=port,
-        username=username,
-        password=password,
-    )
-
+    sftp_service = SFTPService(host, port, username, password)
     result = {
         "success": False,
         "filename": filename,
         "server": host,
         "path": remote_path,
-        "size": file.get("st_size", 0),
+        "size": file_size_byte,
         "server_id": server_id,
     }
 
     try:
-        # Подключаемся к SFTP
         sftp_service.connect()
         logger.debug(f"🔌 Подключение к {host} установлено для загрузки {filename}")
 
-        # Проверяем стабильность файла
         if not sftp_service.file_is_stable(remote_path, file):
             logger.warning(
                 f"⚠️ Файл {filename} нестабилен, будет повторная попытка позже"
             )
-            self.retry(countdown=30)
-            return result
+            set_status(
+                server_id,
+                filename,
+                file_size_byte,
+                FileStatus.RETRY.value,
+                "Файл нестабилен",
+            )
+            raise Exception("Файл нестабилен")
 
-        # Скачиваем файл
-        update_downloaded_file_info(
-            server_id=server_id,
-            filename=filename,
-            size=file_size_mb,
-            status=FileStatus.DOWNLOADING.value,
-        )
-        download_success = sftp_service.download_file(remote_path, file)
+        set_status(server_id, filename, file_size_byte, FileStatus.DOWNLOADING.value)
 
-        if download_success:
-            update_downloaded_file_info(
-                server_id=server_id,
-                filename=filename,
-                size=file_size_mb,
-                status=FileStatus.UPLOADED.value,
+        if sftp_service.download_file(remote_path, file):
+            set_status(
+                server_id,
+                filename,
+                file_size_byte,
+                FileStatus.DOWNLOADED_TO_SERVER.value,
             )
             result["success"] = True
-
-            elapsed_time = time.time() - start_time
+            elapsed_time = (
+                time.time() - self.request.time_start
+                if hasattr(self.request, "time_start")
+                else time.time()
+            )
             download_speed = file_size_mb / elapsed_time if elapsed_time > 0 else 0
-
             logger.info(
-                f"✅ Успешно загружен {filename} "
-                f"({file_size_mb:.2f} МБ за {elapsed_time:.1f} сек, "
-                f"{download_speed:.2f} МБ/сек)"
+                f"✅ Загружен {filename} "
+                f"({file_size_mb:.2f} МБ, {download_speed:.2f} МБ/сек)"
             )
         else:
-            update_downloaded_file_info(
-                server_id=server_id,
-                filename=filename,
-                size=file_size_mb,
-                status=FileStatus.RETRY.value,
-                error_message="Ошибка при скачивании файла",
+            set_status(
+                server_id,
+                filename,
+                file_size_byte,
+                FileStatus.RETRY.value,
+                "Ошибка при скачивании файла",
             )
             logger.error(f"❌ Не удалось загрузить файл {filename}")
-            if self.request.retries < self.max_retries:
-                logger.info(f"🔄 Планирование повторной попытки для {filename}")
-                self.retry(countdown=60)
+            raise Exception("Ошибка при скачивании файла")
 
     except Exception as e:
         logger.error(f"❌ Ошибка при скачивании {filename}: {str(e)}")
-        result["error"] = str(e)
-        update_downloaded_file_info(
-            server_id=server_id,
-            filename=filename,
-            size=file_size_mb,
-            status=FileStatus.ERROR.value,
-            error_message=str(e),
-        )
-        # Повторяем задачу при ошибке
+        set_status(server_id, filename, file_size_byte, FileStatus.ERROR.value, str(e))
         if self.request.retries < self.max_retries:
-            logger.info(
-                f"🔄 Планирование повторной попытки после ошибки для {filename}"
-            )
-            self.retry(countdown=60, exc=e)
-
+            logger.info(f"🔄 Повторная попытка для {filename}")
+            raise self.retry(countdown=60, exc=e)
     finally:
-        # Закрываем соединение
         try:
             sftp_service.disconnect()
             logger.debug(f"🔌 Соединение с {host} закрыто после загрузки {filename}")

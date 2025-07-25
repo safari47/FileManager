@@ -90,6 +90,12 @@ class BaseDAO(Generic[T]):
             )
             raise
 
+    async def count_all(self, session: AsyncSession, filters: BaseModel | None = None):
+        filter_dict = filters.model_dump(exclude_unset=True) if filters else {}
+        query = select(func.count()).select_from(self.model).filter_by(**filter_dict)
+        result = await session.execute(query)
+        return result.scalar_one()
+
     async def add(self, session: AsyncSession, values: BaseModel):
         # Добавление одной записи
         values_dict = values.model_dump(exclude_unset=True)
@@ -137,3 +143,12 @@ class ServerDAO(BaseDAO):
 
 class FileDAO(BaseDAO):
     model = File
+
+    async def upsert_file(
+        self, session: AsyncSession, filters: BaseModel, values: BaseModel
+    ):
+        file = await self.find_one_or_none(session=session, filters=filters)
+        if file:
+            await self.update(session=session, filters=filters, values=values)
+        else:
+            await self.add(session=session, values=values)

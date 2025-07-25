@@ -235,7 +235,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // Глобальные переменные для пагинации
-        const pageSize = 10;
+        const pageSize = 30;
         let serversCurrentPage = 0;
         let filesCurrentPage = 0;
         let serversTotalPages = 0;
@@ -395,27 +395,54 @@
             
             files.forEach(file => {
                 const tr = document.createElement('tr');
-                
-                // Определение класса для статуса
+                // Определение класса и иконки для статуса
                 let statusClass = '';
+                let statusText = '';
+                let statusIcon = '';
                 switch (file.status) {
-                    case 'new': statusClass = 'status-new'; break;
-                    case 'downloading': statusClass = 'status-downloading'; break;
-                    case 'uploading': statusClass = 'status-uploading'; break;
-                    case 'completed': statusClass = 'status-completed'; break;
-                    case 'error': statusClass = 'status-error'; break;
-                    default: statusClass = '';
+                    case 'new':
+                        statusClass = 'bg-primary';
+                        statusText = 'Новый';
+                        statusIcon = '<i class="bi bi-file-earmark-plus"></i>';
+                        break;
+                    case 'downloading':
+                        statusClass = 'bg-warning text-dark';
+                        statusText = 'Загружается';
+                        statusIcon = '<i class="bi bi-arrow-down-circle"></i>';
+                        break;
+                    case 'downloaded_to_server':
+                        statusClass = 'bg-info text-dark';
+                        statusText = 'На сервере';
+                        statusIcon = '<i class="bi bi-hdd-network"></i>';
+                        break;
+                    case 'downloaded_to_minio':
+                        statusClass = 'bg-success';
+                        statusText = 'В MinIO';
+                        statusIcon = '<i class="bi bi-cloud-arrow-up"></i>';
+                        break;
+                    case 'error':
+                        statusClass = 'bg-danger';
+                        statusText = 'Ошибка';
+                        statusIcon = '<i class="bi bi-x-circle"></i>';
+                        break;
+                    case 'retry':
+                        statusClass = 'bg-secondary';
+                        statusText = 'Повтор';
+                        statusIcon = '<i class="bi bi-arrow-repeat"></i>';
+                        break;
+                    default:
+                        statusClass = 'bg-light text-dark';
+                        statusText = file.status;
+                        statusIcon = '<i class="bi bi-question-circle"></i>';
                 }
-                
                 // Форматирование размера файла
                 const fileSize = formatFileSize(file.size);
-                
                 tr.innerHTML = `
                     <td>${file.id || '-'}</td>
                     <td>${file.server_id}</td>
                     <td>${file.filename}</td>
                     <td>${fileSize}</td>
-                    <td><span class="badge ${statusClass}">${file.status}</span></td>
+                    <td><span class="badge ${statusClass} d-flex align-items-center gap-1">${statusIcon} ${statusText}</span></td>
                     <td>${file.minio_path || '-'}</td>
                     <td>${file.error_message ? 
                         `<span class="text-danger" data-bs-toggle="tooltip" title="${file.error_message}">

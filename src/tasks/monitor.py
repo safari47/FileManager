@@ -61,43 +61,25 @@ def scan_all_servers():
         )
         union_servers[connection_key].append((server.id, server.path))
 
-    # Обрабатываем каждую группу серверов
     for connection_params, server_paths in union_servers.items():
         try:
-            # Разбираем параметры подключения
             host, port, username, password = connection_params.split(":")
-            logger.debug(f"🔑 Подготовка подключения к {host}:{port}")
-
-            # Создаем SFTP-сервис
             sftp_service = SFTPService(
                 host=host,
                 port=int(port),
                 username=username,
                 password=password,
             )
-
             try:
-                # Подключаемся к серверу
                 sftp_service.connect()
                 logger.info(f"🔌 Подключение к серверу {host} установлено")
-
-                # Обрабатываем каждый путь на сервере
                 for server_id, path in server_paths:
                     try:
-                        # Получаем список файлов
                         files = sftp_service.scan_directory(path)
-
-                        # Если файлы найдены
                         if files:
                             logger.info(f"📦 Обнаружено {len(files)} файлов в {path}")
-
-                            # Отправляем задачи на скачивание
                             for file in files:
                                 try:
-                                    logger.debug(
-                                        f"📄 Отправка задачи для файла: {file.filename}"
-                                    )
-
                                     download_file_task.apply_async(
                                         kwargs={
                                             "host": host,
@@ -112,7 +94,6 @@ def scan_all_servers():
                                         },
                                         queue="download_queue",
                                     )
-
                                     processed_files += 1
                                 except Exception as e:
                                     logger.error(
@@ -121,30 +102,28 @@ def scan_all_servers():
                                     total_errors += 1
                         else:
                             logger.info(f"📂 Путь {path} не содержит новых файлов")
-
                     except Exception as e:
                         logger.error(
                             f"❌ Ошибка при сканировании пути {path} на сервере {host}: {str(e)}"
                         )
                         total_errors += 1
-
                 processed_servers += 1
-
             except Exception as e:
-                logger.error(f"❌ Ошибка при подключении к серверу {host}: {str(e)}")
+                logger.error(f"❌ Ошибка при работе с сервером {host}: {str(e)}")
                 total_errors += 1
             finally:
-                # Закрываем соединение
-                sftp_service.disconnect()
-                logger.info(f"🔌 Соединение с сервером {host} закрыто")
-
+                try:
+                    sftp_service.disconnect()
+                except Exception as e:
+                    logger.warning(
+                        f"⚠️ Ошибка при отключении от сервера {host}: {str(e)}"
+                    )
         except ValueError as e:
             logger.error(f"❌ Некорректный формат параметров подключения: {str(e)}")
             total_errors += 1
         except Exception as e:
             logger.error(f"❌ Непредвиденная ошибка при обработке сервера: {str(e)}")
             total_errors += 1
-
     # Формируем отчет
     result = {
         "status": "success" if total_errors == 0 else "partial_success",

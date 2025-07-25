@@ -17,9 +17,18 @@ class ServerSchema(ServerID):
 
 
 class FileSchema(BaseModel):
+    id: Optional[int] = Field(
+        None, description="Уникальный идентификатор файла", example=1
+    )
     server_id: int = Field(..., description="ID сервера, на котором хранится файл", example=1)
     filename: str = Field(..., description="Имя файла", example="example.txt") 
     status: str = Field(..., description="Статус файла", example="new")
-    size: int = Field(..., description="Размер файла в байтах", example=1024)
-    minio_path: str = Field(None, description="Путь к файлу в MinIO (если используется)", example="minio/bucket/example.txt")
-    error_message: str = Field(None, description="Сообщение об ошибке (если есть)", example="File not found")
+    size: float = Field(..., description="Размер файла в байтах", example=1024)
+    minio_path: Optional[str] = Field(
+        None,
+        description="Путь к файлу в MinIO (если используется)",
+        example="minio/bucket/example.txt",
+    )
+    error_message: Optional[str] = Field(
+        None, description="Сообщение об ошибке (если есть)", example="File not found"
+    )

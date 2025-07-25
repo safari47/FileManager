@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -90,11 +90,12 @@ async def delete_server(
     description="Получить список всех файлов которые были загружены на сервер",
 )
 async def get_files(
+    response: Response,
     session: AsyncSession = Depends(get_session_without_commit),
     limit: int = Query(default=100, lte=1000),
     offset: int = Query(default=0, ge=0),
 ):
-    """
-    Получает список всех файлов, которые были загружены на сервер.
-    """
-    return await FileDAO().find_all(session=session, limit=limit, offset=offset)
+    total = await FileDAO().count_all(session=session)
+    files = await FileDAO().find_all(session=session, limit=limit, offset=offset)
+    response.headers["X-Total-Count"] = str(total)
+    return files
