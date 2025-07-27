@@ -1,63 +1,13 @@
-import asyncio
-import time
-from typing import Optional
+from datetime import date
 
 from loguru import logger
-from pydantic import BaseModel
 
 from ..celery_app import celery
-from ..database import async_session_maker
 from ..manager.crud import FileDAO
 from ..manager.models import FileStatus
 from ..services.sftp import SFTPService
-
-
-class DownloadedFile(BaseModel):
-    server_id: int
-    filename: str
-    size: float
-
-
-class DownloadedFileUpdateStatus(DownloadedFile):
-    status: str
-    minio_path: Optional[str] = None
-    error_message: Optional[str] = None
-
-
-def update_file_status(data: DownloadedFileUpdateStatus):
-    async def inner():
-        async with async_session_maker() as session:
-            try:
-                await FileDAO().upsert_file(
-                    session=session,
-                    filters=DownloadedFile(
-                        server_id=data.server_id,
-                        filename=data.filename,
-                        size=data.size,
-                    ),
-                    values=data,
-                )
-                await session.commit()
-            except Exception as e:
-                logger.error(
-                    f"Ошибка при обновлении статуса файла {data.filename}: {e}"
-                )
-                await session.rollback()
-                return False
-
-    asyncio.run(inner())
-
-
-def set_status(server_id, filename, size, status, error_message=None):
-    update_file_status(
-        DownloadedFileUpdateStatus(
-            server_id=server_id,
-            filename=filename,
-            size=size,
-            status=status,
-            error_message=error_message,
-        )
-    )
+from .crud import set_status
+from .upload import upload_file_to_minio
 
 
 @celery.task(bind=True, max_retries=10)
@@ -117,16 +67,18 @@ def download_file_task(
                 FileStatus.DOWNLOADED_TO_SERVER.value,
             )
             result["success"] = True
-            elapsed_time = (
-                time.time() - self.request.time_start
-                if hasattr(self.request, "time_start")
-                else time.time()
+            upload_file_to_minio.apply_async(
+                kwargs={
+                    "server_id": server_id,
+                    "filename": filename,
+                    "file_size_byte": file_size_byte,
+                    "local_path": f"{sftp_service.get_local_path(host, remote_path)}/{filename}",
+                    "minio_path": f"{remote_path}/{date.today().isoformat()}/{filename}",
+                    "bucket_name": f"server-{host.replace('.', '-')}",
+                },
+                queue="upload_queue",
             )
-            download_speed = file_size_mb / elapsed_time if elapsed_time > 0 else 0
-            logger.info(
-                f"✅ Загружен {filename} "
-                f"({file_size_mb:.2f} МБ, {download_speed:.2f} МБ/сек)"
-            )
+            logger.info(f"✅ Файл {filename} успешно загружен на сервер {host}")
         else:
             set_status(
                 server_id,

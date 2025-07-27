@@ -9,3 +9,4 @@ uvicorn
 celery
 redis
 paramiko
+minio

@@ -11,6 +11,22 @@ services:
     command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
     restart: always
   
+  minio:
+    container_name: minio
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000" # MinIO API
+      - "9001:9001" # MinIO Console
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    volumes:
+      - ~/minio_data:/data
+    restart: always
+    env_file:
+      - .env
+
   celery_beat:
     container_name: celery_beat
     build: .
@@ -32,11 +48,21 @@ services:
   celery_worker_download:
     container_name: celery_worker_download
     build: .
-    command: celery -A src.celery_app worker --loglevel=error -Q download_queue --concurrency=50
+    command: celery -A src.celery_app worker --loglevel=error -Q download_queue --concurrency=20
     volumes:
       - .:/app
     depends_on:
       - redis
+      
+  celery_worker_upload:
+    container_name: celery_worker_upload
+    build: .
+    command: celery -A src.celery_app worker --loglevel=error -Q upload_queue --concurrency=20
+    volumes:
+      - .:/app
+    depends_on:
+      - redis   
+
   celery_flower:
     container_name: flower
     image: mher/flower:0.9.7

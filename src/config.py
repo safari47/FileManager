@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     REDIS_PORT: int  # Redis port
     REDIS_DB: int  # Redis database number
     LOCAL_DOWNLOAD_PATH: str  # Local path for downloaded files
+    MINIO_ENDPOINT: str  # MinIO endpoint URL
+    MINIO_ACCESS_KEY: str  # MinIO access key
+    MINIO_SECRET_KEY: str  # MinIO secret key
     FORMAT_LOG: str = (
         "{time:YYYY-MM-DD at HH:mm:ss} | {level} | {message}"  # Log format for Loguru
     )
@@ -20,7 +23,6 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=Path(__file__).parent.parent / ".env", env_file_encoding="utf-8"
     )
-    download_dir: Path = Path(__file__).parent.parent / "downloads"
 
 
 settings = Settings()
